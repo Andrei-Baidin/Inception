@@ -1,0 +1,165 @@
+version: "3.9"
+
+services:
+  nginx:
+    build:
+      context: ./requirements/nginx
+      args:
+        - DOMAIN=${DOMAIN_NAME}
+        - PHP_HOST=${PHP_SERVICE_HOST}
+      network: lemp-net
+
+    image: ${NGINX_SERVICE_NAME}:${IMAGE_TAG}
+    container_name: ${NGINX_SERVICE_NAME}
+
+    depends_on:
+      - ${PHP_SERVICE_NAME}
+    restart: always
+
+    networks:
+      lemp-net:
+        aliases:
+          - ${NGINX_SERVICE_HOST}
+
+    ports:
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+
+    volumes:
+      - wp-vol:/var/www/wordpress
+
+
+
+  php:
+    build:
+      context: ./requirements/php
+      args:
+        - PHP_HOST=${PHP_SERVICE_HOST}
+        - MYSQL_HOST=${MYSQL_SERVICE_HOST}
+        - REDIS_HOST=${REDIS_SERVICE_HOST}
+        - DB_NAME=${MYSQL_WP_DB_NAME}
+        - DB_USER=${MYSQL_WP_USER}
+        - DB_PASSWORD=${MYSQL_WP_PASSWORD}
+      network: lemp-net
+
+    image: ${PHP_SERVICE_NAME}:${IMAGE_TAG}
+    container_name: ${PHP_SERVICE_NAME}
+
+    depends_on:
+      - ${MYSQL_SERVICE_NAME}
+      - ${REDIS_SERVICE_NAME}
+    restart: always
+
+    networks:
+      lemp-net:
+        aliases:
+          - ${PHP_SERVICE_HOST}
+
+    volumes:
+      - wp-vol:/var/www/wordpress
+
+
+
+  mysql:
+    build:
+      context: ./requirements/mysql
+      args:
+        - PHP_HOST=${PHP_SERVICE_HOST}
+        - ADMINER_HOST=${ADMINER_SERVICE_HOST}
+        - NET=lemp-net
+        - ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+        - DB_NAME=${MYSQL_WP_DB_NAME}
+        - DB_USER=${MYSQL_WP_USER}
+        - DB_PASSWORD=${MYSQL_WP_PASSWORD}
+      network: lemp-net
+
+    image: ${MYSQL_SERVICE_NAME}:${IMAGE_TAG}
+    container_name: ${MYSQL_SERVICE_NAME}
+
+    restart: always
+
+    networks:
+      lemp-net:
+        aliases:
+          - ${MYSQL_SERVICE_HOST}
+
+    volumes:
+      - mysql-vol:/var/lib/mysql
+
+
+
+  redis:
+    build:
+      context: ./requirements/bonus/redis
+      args:
+        - PHP_HOST=${PHP_SERVICE_HOST}
+      network: lemp-net
+
+    image: ${REDIS_SERVICE_NAME}:${IMAGE_TAG}
+    container_name: ${REDIS_SERVICE_NAME}
+
+    restart: always
+
+    networks:
+      lemp-net:
+        aliases:
+          - ${REDIS_SERVICE_HOST}
+
+    volumes:
+      - redis-vol:/cache
+
+
+
+  adminer:
+    build:
+      context: ./requirements/bonus/adminer
+      args:
+        - ADMINER_HOST=${ADMINER_SERVICE_HOST}
+      network: lemp-net
+
+    image: ${ADMINER_SERVICE_NAME}:${IMAGE_TAG}
+    container_name: ${ADMINER_SERVICE_NAME}
+
+    depends_on:
+      - ${MYSQL_SERVICE_NAME}
+    restart: always
+
+    networks:
+      lemp-net:
+        aliases:
+          - ${ADMINER_SERVICE_HOST}
+
+
+
+volumes:
+  mysql-vol:
+    name: mysql-vol
+    driver: local
+    driver_opts:
+      device: /home/nnamor/data/mysql
+      o: bind
+      type: none
+
+  wp-vol:
+    name: wp-vol
+    driver: local
+    driver_opts:
+      device: /home/nnamor/data/wordpress
+      o: bind
+      type: none
+
+  redis-vol:
+    name: redis-vol
+    driver: local
+    driver_opts:
+      device: /home/nnamor/data/redis
+      o: bind
+      type: none
+
+networks:
+  lemp-net:
+    name: lemp-net
+    driver: bridge
+    external: false
